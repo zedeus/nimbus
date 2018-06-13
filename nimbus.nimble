@@ -13,6 +13,8 @@ requires "nim >= 0.18.1",
          "stint",
          "https://github.com/status-im/nim-eth-common",
          "https://github.com/status-im/nim-eth-p2p",
+         "https://github.com/status-im/nim-asyncdispatch2",
+         "https://github.com/status-im/nim-eth-rpc",
          "https://github.com/status-im/nim-eth-keyfile"
 
 proc test(name: string, lang = "c") =

@@ -7,11 +7,13 @@
 # This file may not be copied, modified, or distributed except according to
 # those terms.
 
-import config, asyncdispatch
-import p2p/service, p2p/disc4service
+import strutils
+import asyncdispatch2, eth-rpc/server
+import config, rpc/common
 
 when isMainModule:
   var message: string
+  echo NimbusHeader
   if processArguments(message) != ConfigStatus.Success:
     echo message
     quit(QuitFailure)
@@ -19,12 +21,11 @@ when isMainModule:
     if len(message) > 0:
       echo message
 
-  var disc4: Discovery4Service
-  if disc4.init() != ServiceStatus.Success:
-    quit(QuitFailure)
-  if disc4.configure() != ServiceStatus.Success:
-    echo disc4.errorMessage()
-    quit(QuitFailure)
-  if disc4.start() != ServiceStatus.Success:
-    echo disc4.errorMessage()
-    quit(QuitFailure)
+  var conf = getConfiguration()
+  if RpcFlags.Enabled in conf.rpc.flags:
+    var rpcserver = newRpcServer(conf.rpc.binds)
+    setupCommonRPC(rpcserver)
+    rpcserver.start()
+
+  while true:
+    poll()
