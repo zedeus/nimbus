@@ -2,7 +2,8 @@ import ../db/[db_chain, state_db], eth_common, chronicles, ../vm_state, ../vm_ty
   ../vm/[computation, interpreter_dispatch, message], ../constants, stint, nimcrypto,
   ../vm_state_transactions,
   eth_trie/db, eth_trie, rlp,
-  sugar
+  sugar,
+  ../db/backends/caching_backend
 
 type
   Chain* = ref object of AbstractChainDB
@@ -108,24 +109,26 @@ proc calcTxRoot(transactions: openarray[Transaction]): Hash256 =
 method persistBlocks*(c: Chain, headers: openarray[BlockHeader], bodies: openarray[BlockBody]) =
   # Run the VM here
   assert(headers.len == bodies.len)
+  if headers.len == 0: return
 
   let blockReward = 5.u256 * pow(10.u256, 18) # 5 ETH
 
-  let transaction = c.db.db.beginTransaction()
-  defer: transaction.dispose()
+  let journal = newCachingDB(c.db.db)
+  let journalTrieDB = trieDB(journal)
+  let chainDb = newBaseChainDB(journalTrieDB)
 
   echo "Persisting blocks: ", headers[0].blockNumber, " - ", headers[^1].blockNumber
   for i in 0 ..< headers.len:
-    let head = c.db.getCanonicalHead()
+    let head = chainDb.getCanonicalHead()
     assert(head.blockNumber == headers[i].blockNumber - 1)
-    var stateDb = newAccountStateDB(c.db.db, head.stateRoot)
+    var stateDb = newAccountStateDB(journalTrieDB, head.stateRoot)
     var gasReward = 0.u256
 
     assert(bodies[i].transactions.calcTxRoot == headers[i].txRoot)
 
     if headers[i].txRoot != BLANK_ROOT_HASH:
       # assert(head.blockNumber == headers[i].blockNumber - 1)
-      let vmState = newBaseVMState(head, c.db)
+      let vmState = newBaseVMState(head, chainDb)
       assert(bodies[i].transactions.len != 0)
 
       if bodies[i].transactions.len != 0:
@@ -135,7 +138,7 @@ method persistBlocks*(c: Chain, headers: openarray[BlockHeader], bodies: openarr
         for t in bodies[i].transactions:
           var sender: EthAddress
           if t.getSender(sender):
-            gasReward += processTransaction(stateDb, t, sender, head, c.db)
+            gasReward += processTransaction(stateDb, t, sender, head, chainDb)
           else:
             assert(false, "Could not get sender")
 
@@ -163,5 +166,5 @@ method persistBlocks*(c: Chain, headers: openarray[BlockHeader], bodies: openarr
     discard c.db.persistHeaderToDb(headers[i])
     assert(c.db.getCanonicalHead().blockHash == headers[i].blockHash)
 
-  transaction.commit()
+  journal.commit()
 
