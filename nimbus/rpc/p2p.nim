@@ -55,7 +55,7 @@ proc setupEthRpc*(node: EthereumNode, chain: BaseChainDB, rpcsrv: RpcServer) =
     result = vmState.chaindb.getStateDb(vmState.blockHeader.hash, readOnly)
 
   func accountDbFromTag(tag: string, readOnly = true): AccountStateDb =
-    result = getAccountDb(chain.headerFromTag(tag))
+    result = getAccountDb(chain.headerFromTag(tag), readOnly)
 
   proc getBlockBody(hash: KeccakHash): BlockBody =
     if not chain.getBlockBody(hash, result):
