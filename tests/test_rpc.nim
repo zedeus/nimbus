@@ -1,5 +1,5 @@
 import
-  unittest, json, strformat, nimcrypto, rlp, options,
+  unittest, json, strformat, nimcrypto, rlp, options, macros, typetraits,
   json_rpc/[rpcserver, rpcclient],
   ../nimbus/rpc/[common, p2p, hexstrings, rpc_types],
   ../nimbus/constants,
@@ -8,8 +8,8 @@ import
   ../nimbus/p2p/chain,
   ../nimbus/genesis,  
   eth_trie/db,
-  eth_p2p, eth_keys
-import rpcclient/test_hexstrings
+  eth_p2p, eth_keys,
+  rpcclient/test_hexstrings
 
 # Perform checks for hex string validation
 doHexStrTests()
@@ -70,6 +70,42 @@ proc doTests =
   rpcServer.start()
   waitFor client.connect("localhost", Port(8545))
 
+  macro makeTest(callName: untyped, data: untyped): untyped =
+    ## Generate generic testing code for checking rpcs.
+    result = newStmtList()
+
+    let
+      testName = $callName
+      rpcResult = newIdentNode "r"
+      resultTitle = "RPC \"" & testName & "\" returned: "
+    var
+      call = nnkCall.newTree()
+      expectedResult: NimNode
+
+    call.add(nnkDotExpr.newTree(ident "client", ident testName))
+    
+    for node in data.children:
+      if node.len > 1 and node.kind == nnkCall and node[0].kind == nnkIdent and
+        node[1].kind == nnkStmtList and node[1].len > 0:
+          case $node[0]
+          of "params":
+            for param in node[1].children:
+              call.add(param)
+          of "expected":
+            let res = node[1][0]
+            # TODO: Expect failure
+            expectedResult = quote do:
+              check `rpcResult` == `res`
+          
+    if expectedResult == nil:
+      expectedResult = quote do: echo "[Result is not checked]"
+
+    result = quote do:
+      test `testName`: 
+        var `rpcResult` = waitFor `call`
+        echo `resultTitle`, `rpcResult`, " (type: ", `rpcResult`.type.name, ")"
+        `expectedResult`
+
   suite "Remote Procedure Calls":
     # TODO: Currently returning 'block not found' when fetching header in p2p, so cannot perform tests
     test "eth_call":
@@ -86,7 +122,7 @@ proc doTests =
       let blockNum = state.blockheader.blockNumber
       var r = waitFor client.eth_getBalance(address.toEthAddressStr, "0x" & blockNum.toHex)
       echo r
-
+      
   rpcServer.stop()
   rpcServer.close()
 
