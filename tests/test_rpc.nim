@@ -106,23 +106,30 @@ proc doTests =
         echo `resultTitle`, `rpcResult`, " (type: ", `rpcResult`.type.name, ")"
         `expectedResult`
 
-  suite "Remote Procedure Calls":
-    # TODO: Currently returning 'block not found' when fetching header in p2p, so cannot perform tests
-    test "eth_call":
-      let
-        blockNum = state.blockheader.blockNumber
-        callParams = EthCall(value: some(100.u256))
-      var r = waitFor client.eth_call(callParams, "0x" & blockNum.toHex)
-      echo r
-    test "eth_getBalance":
-      expect ValueError:
-        # check error is raised on null address
-        var r = waitFor client.eth_getBalance(ZERO_ADDRESS.toEthAddressStr, "0x0")
+  let currentBlockNumber = "0x" & state.blockheader.blockNumber.toHex
 
-      let blockNum = state.blockheader.blockNumber
-      var r = waitFor client.eth_getBalance(address.toEthAddressStr, "0x" & blockNum.toHex)
-      echo r
-      
+  suite "Remote Procedure Calls":
+
+    makeTest(eth_blockNumber):
+      expected: 0
+
+    makeTest(eth_call):
+      params:
+        EthCall(value: some(100.u256))
+        currentBlockNumber
+
+    makeTest(eth_getBalance):
+      params:
+        ZERO_ADDRESS.toEthAddressStr
+        "0x0"
+      expected: balance
+    
+    makeTest(eth_getStorageAt):
+      params:
+        address.toEthAddressStr
+        0
+        currentBlockNumber
+
   rpcServer.stop()
   rpcServer.close()
 
