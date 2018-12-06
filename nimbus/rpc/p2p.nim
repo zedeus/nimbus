@@ -10,7 +10,7 @@
 import
   strutils, times, options,
   nimcrypto, json_rpc/rpcserver, hexstrings, stint, byteutils, ranges/typedranges,
-  eth_common, eth_p2p, eth_keys, eth_trie/db, rlp,
+  eth_common, eth_p2p, eth_keys, eth_trie, rlp,
   ../utils/header, ../transaction, ../config, ../vm_state, ../constants, ../vm_types,
   ../vm_state_transactions,
   ../db/[db_chain, state_db, storage_types],
@@ -99,13 +99,13 @@ proc setupEthRpc*(node: EthereumNode, chain: BaseChainDB, rpcsrv: RpcServer) =
 
   rpcsrv.rpc("eth_accounts") do() -> seq[EthAddressStr]:
     ## Returns a list of addresses owned by client.
-    result = @[]
+    discard
 
   rpcsrv.rpc("eth_blockNumber") do() -> BlockNumber:
     ## Returns integer of the current block number the client is on.
     result = chain.getCanonicalHead().blockNumber
 
-  rpcsrv.rpc("eth_getBalance") do(data: EthAddressStr, quantityTag: string) -> UInt256:
+  rpcsrv.rpc("eth_getBalance") do(address: EthAddressStr, quantityTag: string) -> UInt256:
     ## Returns the balance of the account of given address.
     ##
     ## data: address to check for balance.
@@ -113,33 +113,33 @@ proc setupEthRpc*(node: EthereumNode, chain: BaseChainDB, rpcsrv: RpcServer) =
     ## Returns integer of the current balance in wei.
     let
       accountDb = accountDbFromTag(quantityTag)
-      addrBytes = data.toAddress
+      addrBytes = address.toAddress
       balance = accountDb.get_balance(addrBytes)
 
     result = balance
 
-  rpcsrv.rpc("eth_getStorageAt") do(data: EthAddressStr, quantity: int, quantityTag: string) -> UInt256:
+  rpcsrv.rpc("eth_getStorageAt") do(address: EthAddressStr, quantity: int, quantityTag: string) -> UInt256:
     ## Returns the value from a storage position at a given address.
     ##
-    ## data: address of the storage.
+    ## address: address of the storage.
     ## quantity: integer of the position in the storage.
     ## quantityTag: integer block number, or the string "latest", "earliest" or "pending", see the default block parameter.
     ## Returns: the value at this storage position.
     let
       accountDb = accountDbFromTag(quantityTag)
-      addrBytes = data.toAddress
+      addrBytes = address.toAddress
       storage = accountDb.getStorage(addrBytes, quantity.u256)
     if storage[1]:
       result = storage[0]
 
-  rpcsrv.rpc("eth_getTransactionCount") do(data: EthAddressStr, quantityTag: string) -> AccountNonce:
+  rpcsrv.rpc("eth_getTransactionCount") do(address: EthAddressStr, quantityTag: string) -> AccountNonce:
     ## Returns the number of transactions sent from an address.
     ##
     ## data: address.
     ## quantityTag: integer block number, or the string "latest", "earliest" or "pending", see the default block parameter.
     ## Returns integer of the number of transactions send from this address.
     let
-      addrBytes = data.toAddress
+      addrBytes = address.toAddress
       accountDb = accountDbFromTag(quantityTag)
     result = accountDb.getNonce(addrBytes)
 
@@ -254,13 +254,13 @@ proc setupEthRpc*(node: EthereumNode, chain: BaseChainDB, rpcsrv: RpcServer) =
 
     result = newBaseComputation(vmState, blockNumber, message)
 
-  rpcsrv.rpc("eth_call") do(call: EthCall, quantityTag: string) -> HexDataStr:
+  rpcsrv.rpc("eth_call") do(call: EthCall, quantityTag: HexQuantityStr) -> HexDataStr:
     ## Executes a new message call immediately without creating a transaction on the block chain.
     ##
     ## call: the transaction call object.
     ## quantityTag:  integer block number, or the string "latest", "earliest" or "pending", see the default block parameter.
     ## Returns the return value of executed contract.
-    let header = headerFromTag(chain, quantityTag)
+    let header = headerFromTag(chain, quantityTag.string)
     var
       vmState = newBaseVMState(header, chain)
       gasLimit =
