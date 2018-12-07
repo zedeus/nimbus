@@ -1,6 +1,8 @@
 ## This module contains signatures for the Ethereum client RPCs.
 ## The signatures are not imported directly, but read and processed with parseStmt,
 ## then a procedure body is generated to marshal native Nim parameters to json and visa versa.
+## Note that whilst the RPCs use distinct types to enforce validation server-side,
+## we can use less strict types for testing purposes. 
 import json, stint, eth_common, ../../nimbus/rpc/hexstrings, ../../nimbus/rpc/rpc_types
 
 proc web3_clientVersion(): string
@@ -10,22 +12,22 @@ proc net_peerCount(): int
 proc net_listening(): bool
 proc eth_protocolVersion(): string
 proc eth_syncing(): JsonNode
-proc eth_coinbase(): EthAddressStr
+proc eth_coinbase(): string
 proc eth_mining(): bool
 proc eth_hashrate(): int
 proc eth_gasPrice(): GasInt
-proc eth_accounts(): seq[EthAddressStr]
+proc eth_accounts(): seq[string]
 proc eth_blockNumber(): BlockNumber
-proc eth_getBalance(data: EthAddressStr, quantityTag: string): UInt256
-proc eth_getStorageAt(data: EthAddressStr, quantity: int, quantityTag: string): string
-proc eth_getTransactionCount(data: EthAddressStr, quantityTag: string)
-proc eth_getBlockTransactionCountByHash(data: array[32, byte])
-proc eth_getBlockTransactionCountByNumber(quantityTag: string)
+proc eth_getBalance(address: string, blockTag: string): UInt256
+proc eth_getStorageAt(address: string, index: int, blockTag: string): string
+proc eth_getTransactionCount(address: string, blockTag: string): AccountNonce
+proc eth_getBlockTransactionCountByHash(blockHash: string): AccountNonce
+proc eth_getBlockTransactionCountByNumber(blockTag: string): AccountNonce
 proc eth_getUncleCountByBlockHash(data: array[32, byte])
-proc eth_getUncleCountByBlockNumber(quantityTag: string)
-proc eth_getCode(data: EthAddressStr, quantityTag: string): HexDataStr
-proc eth_sign(data:EthAddressStr, message: HexDataStr): HexDataStr
-proc eth_sendRawTransaction(data: string, quantityTag: int): UInt256
+proc eth_getUncleCountByBlockNumber(blockTag: string)
+proc eth_getCode(data: string, blockTag: string): string
+proc eth_sign(data: string, message: string): string
+proc eth_sendRawTransaction(data: string, blockTag: int): UInt256
 proc eth_call(call: EthCall, blockNum: string): string
 #[
 proc eth_sendTransaction(obj: EthSend): UInt256
