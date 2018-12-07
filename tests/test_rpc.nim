@@ -6,7 +6,7 @@ import
   ../nimbus/nimbus/[vm_state, config],
   ../nimbus/db/[state_db, db_chain], eth_common, byteutils,
   ../nimbus/p2p/chain,
-  ../nimbus/genesis,  
+  ../nimbus/genesis, ../nimbus/utils/header,
   eth_trie/db,
   eth_p2p, eth_keys,
   rpcclient/[test_hexstrings, rpctesting]
@@ -104,6 +104,20 @@ proc doTests =
         addressHexStr
         currentBlockNumberStr()
       expected: 0
+
+    rpcTest(eth_getBlockTransactionCountByHash):
+      params: "0x" & chain.getCanonicalHead.hash.data.toHex
+      expected: 0
+
+    rpcTest(eth_getBlockTransactionCountByNumber):
+      params: currentBlockNumberStr()
+      expected: 0
+
+    rpcTest(eth_getCode):
+      params:
+        addressHexStr
+        currentBlockNumberStr()
+      expected: "0x0"
 
   rpcServer.stop()
   rpcServer.close()
