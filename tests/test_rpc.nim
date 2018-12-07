@@ -9,7 +9,7 @@ import
   ../nimbus/genesis,  
   eth_trie/db,
   eth_p2p, eth_keys,
-  rpcclient/test_hexstrings
+  rpcclient/[test_hexstrings, rpctesting]
 
 # Perform checks for hex string validation
 doHexStrTests()
@@ -37,8 +37,8 @@ proc setupEthNode: EthereumNode =
   result = newEthereumNode(keypair, srvAddress, conf.net.networkId,
                               nil, "nimbus 0.1.0")
 
-proc toEthAddressStr(address: EthAddress): EthAddressStr =
-  result = ("0x" & address.toHex).ethAddressStr
+func toAddressStr(address: EthAddress): string =
+  result = "0x" & address.toHex
 
 proc doTests =
   # TODO: Include other transports such as Http
@@ -51,13 +51,19 @@ proc doTests =
     state = newBaseVMState(header, chain)
   ethNode.chain = newChain(chain)
 
+  # Initialise state
   let
     balance = 100.u256
     address: EthAddress = hexToByteArray[20]("0x0f572e5295c57f15886f9b263e2f6d2d6c7b5ec6")
+    addressHexStr = address.toAddressStr
     conf = getConfiguration()
   defaultGenesisBlockForNetwork(conf.net.networkId.toPublicNetwork()).commit(chain)
   state.mutateStateDB:
     db.setBalance(address, balance)
+
+  # Future tests may update the block number
+  func currentBlockNumber: BlockNumber = chain.getCanonicalHead.blockNumber
+  func currentBlockNumberStr: string = "0x" & currentBlockNumber().toHex
   
   # Create Ethereum RPCs
   var
@@ -70,65 +76,34 @@ proc doTests =
   rpcServer.start()
   waitFor client.connect("localhost", Port(8545))
 
-  macro makeTest(callName: untyped, data: untyped): untyped =
-    ## Generate generic testing code for checking rpcs.
-    result = newStmtList()
-
-    let
-      testName = $callName
-      rpcResult = newIdentNode "r"
-      resultTitle = "RPC \"" & testName & "\" returned: "
-    var
-      call = nnkCall.newTree()
-      expectedResult: NimNode
-
-    call.add(nnkDotExpr.newTree(ident "client", ident testName))
-    
-    for node in data.children:
-      if node.len > 1 and node.kind == nnkCall and node[0].kind == nnkIdent and
-        node[1].kind == nnkStmtList and node[1].len > 0:
-          case $node[0]
-          of "params":
-            for param in node[1].children:
-              call.add(param)
-          of "expected":
-            let res = node[1][0]
-            # TODO: Expect failure
-            expectedResult = quote do:
-              check `rpcResult` == `res`
-          
-    if expectedResult == nil:
-      expectedResult = quote do: echo "[Result is not checked]"
-
-    result = quote do:
-      test `testName`: 
-        var `rpcResult` = waitFor `call`
-        echo `resultTitle`, `rpcResult`, " (type: ", `rpcResult`.type.name, ")"
-        `expectedResult`
-
-  let currentBlockNumber = "0x" & state.blockheader.blockNumber.toHex
-
   suite "Remote Procedure Calls":
 
-    makeTest(eth_blockNumber):
+    rpcTest(eth_blockNumber):
       expected: 0
 
-    makeTest(eth_call):
+    rpcTest(eth_call):
       params:
         EthCall(value: some(100.u256))
-        currentBlockNumber
+        currentBlockNumberStr()
 
-    makeTest(eth_getBalance):
+    rpcTest(eth_getBalance):
       params:
-        ZERO_ADDRESS.toEthAddressStr
+        ZERO_ADDRESS.toAddressStr
         "0x0"
       expected: balance
     
-    makeTest(eth_getStorageAt):
+    rpcTest(eth_getStorageAt):
       params:
-        address.toEthAddressStr
+        addressHexStr
         0
-        currentBlockNumber
+        currentBlockNumberStr()
+      expected: "0x0"
+
+    rpcTest(eth_getTransactionCount):
+      params:
+        addressHexStr
+        currentBlockNumberStr()
+      expected: 0
 
   rpcServer.stop()
   rpcServer.close()
