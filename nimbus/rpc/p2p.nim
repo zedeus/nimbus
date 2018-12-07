@@ -59,7 +59,7 @@ proc setupEthRpc*(node: EthereumNode, chain: BaseChainDB, rpcsrv: RpcServer) =
 
   proc getBlockBody(hash: KeccakHash): BlockBody =
     if not chain.getBlockBody(hash, result):
-      raise newException(ValueError, "Cannot find hash")
+      raise newException(ValueError, "Cannot find hash for block")
 
   rpcsrv.rpc("net_version") do() -> uint:
     let conf = getConfiguration()
@@ -105,84 +105,84 @@ proc setupEthRpc*(node: EthereumNode, chain: BaseChainDB, rpcsrv: RpcServer) =
     ## Returns integer of the current block number the client is on.
     result = chain.getCanonicalHead().blockNumber
 
-  rpcsrv.rpc("eth_getBalance") do(address: EthAddressStr, quantityTag: string) -> UInt256:
+  rpcsrv.rpc("eth_getBalance") do(address: EthAddressStr, blockTag: string) -> UInt256:
     ## Returns the balance of the account of given address.
     ##
     ## data: address to check for balance.
-    ## quantityTag: integer block number, or the string "latest", "earliest" or "pending", see the default block parameter.
+    ## blockTag: integer block number, or the string "latest", "earliest" or "pending", see the default block parameter.
     ## Returns integer of the current balance in wei.
     let
-      accountDb = accountDbFromTag(quantityTag)
+      accountDb = accountDbFromTag(blockTag)
       addrBytes = address.toAddress
       balance = accountDb.get_balance(addrBytes)
 
     result = balance
 
-  rpcsrv.rpc("eth_getStorageAt") do(address: EthAddressStr, quantity: int, quantityTag: string) -> UInt256:
+  rpcsrv.rpc("eth_getStorageAt") do(address: EthAddressStr, index: int, blockTag: string) -> UInt256:
     ## Returns the value from a storage position at a given address.
     ##
     ## address: address of the storage.
-    ## quantity: integer of the position in the storage.
-    ## quantityTag: integer block number, or the string "latest", "earliest" or "pending", see the default block parameter.
+    ## index: integer of the position in the storage.
+    ## blockTag: integer block number, or the string "latest", "earliest" or "pending", see the default block parameter.
     ## Returns: the value at this storage position.
     let
-      accountDb = accountDbFromTag(quantityTag)
+      accountDb = accountDbFromTag(blockTag)
       addrBytes = address.toAddress
-      storage = accountDb.getStorage(addrBytes, quantity.u256)
+      storage = accountDb.getStorage(addrBytes, index.u256)
     if storage[1]:
       result = storage[0]
 
-  rpcsrv.rpc("eth_getTransactionCount") do(address: EthAddressStr, quantityTag: string) -> AccountNonce:
+  rpcsrv.rpc("eth_getTransactionCount") do(address: EthAddressStr, blockTag: string) -> Natural:
     ## Returns the number of transactions sent from an address.
     ##
-    ## data: address.
-    ## quantityTag: integer block number, or the string "latest", "earliest" or "pending", see the default block parameter.
+    ## address: address of account.
+    ## blockTag: integer block number, or the string "latest", "earliest" or "pending", see the default block parameter.
     ## Returns integer of the number of transactions send from this address.
     let
       addrBytes = address.toAddress
-      accountDb = accountDbFromTag(quantityTag)
+      accountDb = accountDbFromTag(blockTag)
     result = accountDb.getNonce(addrBytes)
 
-  rpcsrv.rpc("eth_getBlockTransactionCountByHash") do(data: EthHashStr) -> int:
+  rpcsrv.rpc("eth_getBlockTransactionCountByHash") do(blockHash: EthHashStr) -> Natural:
     ## Returns the number of transactions in a block from a block matching the given block hash.
     ##
-    ## data: hash of a block
+    ## blockHash: hash of a block.
     ## Returns integer of the number of transactions in this block.
-    var hashData = data.toHash
+    let hashData = blockHash.toHash
     result = getBlockBody(hashData).transactions.len
 
-  rpcsrv.rpc("eth_getBlockTransactionCountByNumber") do(quantityTag: string) -> int:
+  rpcsrv.rpc("eth_getBlockTransactionCountByNumber") do(blockTag: string) -> Natural:
     ## Returns the number of transactions in a block matching the given block number.
     ##
-    ## data: integer of a block number, or the string "earliest", "latest" or "pending", as in the default block parameter.
+    ## blockTag: integer of a block number, or the string "earliest", "latest" or "pending", as in the default block parameter.
     ## Returns integer of the number of transactions in this block.
-    let header = chain.headerFromTag(quantityTag)
+    let header = chain.headerFromTag(blockTag)
     result = getBlockBody(header.hash).transactions.len
 
-  rpcsrv.rpc("eth_getUncleCountByBlockHash") do(data: EthHashStr) -> int:
+  rpcsrv.rpc("eth_getUncleCountByBlockHash") do(blockHash: EthHashStr) -> Natural:
     ## Returns the number of uncles in a block from a block matching the given block hash.
     ##
-    ## data: hash of a block.
+    ## blockHash: hash of a block.
     ## Returns integer of the number of uncles in this block.
-    var hashData = data.toHash
+    var hashData = blockHash.toHash
     result = getBlockBody(hashData).uncles.len
 
-  rpcsrv.rpc("eth_getUncleCountByBlockNumber") do(quantityTag: string) -> int:
+  rpcsrv.rpc("eth_getUncleCountByBlockNumber") do(blockTag: string) -> Natural:
     ## Returns the number of uncles in a block from a block matching the given block number.
     ##
-    ## quantityTag: integer of a block number, or the string "latest", "earliest" or "pending", see the default block parameter.
+    ## blockTag: integer of a block number, or the string "latest", "earliest" or "pending", see the default block parameter.
     ## Returns integer of uncles in this block.
-    let header = chain.headerFromTag(quantityTag)
+    let header = chain.headerFromTag(blockTag)
     result = getBlockBody(header.hash).uncles.len
 
-  rpcsrv.rpc("eth_getCode") do(data: EthAddressStr, quantityTag: string) -> HexDataStr:
+  rpcsrv.rpc("eth_getCode") do(data: EthAddressStr, blockTag: string) -> HexDataStr:
     ## Returns code at a given address.
     ##
     ## data: address
-    ## quantityTag: integer block number, or the string "latest", "earliest" or "pending", see the default block parameter.
+    ## blockTag: integer block number, or the string "latest", "earliest" or "pending", see the default block parameter.
     ## Returns the code from the given address.
     let
-      accountDb = accountDbFromTag(quantityTag)
+      accountDb = accountDbFromTag(blockTag)
       addrBytes = toAddress(data)
       storage = accountDb.getCode(addrBytes)
     # Easier to return the string manually here rather than expect ByteRange to be marshalled
@@ -226,7 +226,7 @@ proc setupEthRpc*(node: EthereumNode, chain: BaseChainDB, rpcsrv: RpcServer) =
     # TODO: Relies on pending pool implementation
     discard
 
-  rpcsrv.rpc("eth_sendRawTransaction") do(data: string, quantityTag: int) -> HexDataStr:
+  rpcsrv.rpc("eth_sendRawTransaction") do(data: HexDataStr) -> HexDataStr:
     ## Creates new message call transaction or a contract creation for signed transactions.
     ##
     ## data: the signed transaction data.
@@ -254,13 +254,13 @@ proc setupEthRpc*(node: EthereumNode, chain: BaseChainDB, rpcsrv: RpcServer) =
 
     result = newBaseComputation(vmState, blockNumber, message)
 
-  rpcsrv.rpc("eth_call") do(call: EthCall, quantityTag: HexQuantityStr) -> HexDataStr:
+  rpcsrv.rpc("eth_call") do(call: EthCall, blockTag: HexQuantityStr) -> HexDataStr:
     ## Executes a new message call immediately without creating a transaction on the block chain.
     ##
     ## call: the transaction call object.
-    ## quantityTag:  integer block number, or the string "latest", "earliest" or "pending", see the default block parameter.
+    ## blockTag:  integer block number, or the string "latest", "earliest" or "pending", see the default block parameter.
     ## Returns the return value of executed contract.
-    let header = headerFromTag(chain, quantityTag.string)
+    let header = headerFromTag(chain, blockTag.string)
     var
       vmState = newBaseVMState(header, chain)
       gasLimit =
@@ -289,13 +289,13 @@ proc setupEthRpc*(node: EthereumNode, chain: BaseChainDB, rpcsrv: RpcServer) =
     discard comp.execComputation
     result = ("0x" & nimcrypto.toHex(comp.output)).HexDataStr
 
-  rpcsrv.rpc("eth_estimateGas") do(call: EthCall, quantityTag: string) -> GasInt:
+  rpcsrv.rpc("eth_estimateGas") do(call: EthCall, blockTag: string) -> GasInt:
     ## Generates and returns an estimate of how much gas is necessary to allow the transaction to complete.
     ## The transaction will not be added to the blockchain. Note that the estimate may be significantly more than
     ## the amount of gas actually used by the transaction, for a variety of reasons including EVM mechanics and node performance.
     ##
     ## call: the transaction call object.
-    ## quantityTag:  integer block number, or the string "latest", "earliest" or "pending", see the default block parameter.
+    ## blockTag:  integer block number, or the string "latest", "earliest" or "pending", see the default block parameter.
     ## Returns the amount of gas used.
     discard
 
@@ -342,14 +342,14 @@ proc setupEthRpc*(node: EthereumNode, chain: BaseChainDB, rpcsrv: RpcServer) =
       header = chain.getBlockHeader(h)
     result = some(populateBlockObject(header, getBlockBody(h)))
 
-  rpcsrv.rpc("eth_getBlockByNumber") do(quantityTag: string, fullTransactions: bool) -> Option[BlockObject]:
+  rpcsrv.rpc("eth_getBlockByNumber") do(blockTag: string, fullTransactions: bool) -> Option[BlockObject]:
     ## Returns information about a block by block number.
     ##
-    ## quantityTag: integer of a block number, or the string "earliest", "latest" or "pending", as in the default block parameter.
+    ## blockTag: integer of a block number, or the string "earliest", "latest" or "pending", as in the default block parameter.
     ## fullTransactions: If true it returns the full transaction objects, if false only the hashes of the transactions.
     ## Returns BlockObject or nil when no block was found.
     let
-      header = chain.headerFromTag(quantityTag)
+      header = chain.headerFromTag(blockTag)
     result = some(populateBlockObject(header, getBlockBody(header.hash)))
 
   proc populateTransactionObject(transaction: Transaction, txIndex: int64, blockHeader: BlockHeader, blockHash: Hash256): TransactionObject =
@@ -400,13 +400,13 @@ proc setupEthRpc*(node: EthereumNode, chain: BaseChainDB, rpcsrv: RpcServer) =
       transaction = getBlockBody(blockHash).transactions[quantity]
     populateTransactionObject(transaction, quantity, header, blockHash)
 
-  rpcsrv.rpc("eth_getTransactionByBlockNumberAndIndex") do(quantityTag: string, quantity: int) -> TransactionObject:
+  rpcsrv.rpc("eth_getTransactionByBlockNumberAndIndex") do(blockTag: string, quantity: int) -> TransactionObject:
     ## Returns information about a transaction by block number and transaction index position.
     ##
-    ## quantityTag: a block number, or the string "earliest", "latest" or "pending", as in the default block parameter.
+    ## blockTag: a block number, or the string "earliest", "latest" or "pending", as in the default block parameter.
     ## quantity: the transaction index position.
     let
-      header = chain.headerFromTag(quantityTag)
+      header = chain.headerFromTag(blockTag)
       blockHash = header.hash
       transaction = getBlockBody(blockHash).transactions[quantity]
     populateTransactionObject(transaction, quantity, header, blockHash)
@@ -465,14 +465,14 @@ proc setupEthRpc*(node: EthereumNode, chain: BaseChainDB, rpcsrv: RpcServer) =
     let uncle = body.uncles[quantity]
     result = some(populateBlockObject(uncle, body))
 
-  rpcsrv.rpc("eth_getUncleByBlockNumberAndIndex") do(quantityTag: string, quantity: int) -> Option[BlockObject]:
+  rpcsrv.rpc("eth_getUncleByBlockNumberAndIndex") do(blockTag: string, quantity: int) -> Option[BlockObject]:
     # Returns information about a uncle of a block by number and uncle index position.
     ##
-    ## quantityTag: a block number, or the string "earliest", "latest" or "pending", as in the default block parameter.
+    ## blockTag: a block number, or the string "earliest", "latest" or "pending", as in the default block parameter.
     ## quantity: the uncle's index position.
     ## Returns BlockObject or nil when no block was found.
     let
-      header = chain.headerFromTag(quantityTag)
+      header = chain.headerFromTag(blockTag)
       body = getBlockBody(header.hash)
     if quantity < 0 or quantity >= body.uncles.len:
       raise newException(ValueError, "Uncle index out of range")
