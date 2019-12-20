@@ -204,6 +204,11 @@ proc nimbus_delete_keypair(id: Identifier): bool
   var unneeded: KeyPair
   result = whisperKeys.asymKeys.take(id.toHex(), unneeded)
 
+proc nimbus_delete_keypairs(): bool
+    {.exportc, dynlib, raises: [].} =
+  clear(whisperKeys.asymKeys)
+  result = true
+
 proc nimbus_get_private_key(id: Identifier, privateKey: var PrivateKey):
     bool {.exportc, dynlib, raises: [OSError, IOError, ValueError].} =
   doAssert(not (unsafeAddr id).isNil, "Key id cannot be nil.")

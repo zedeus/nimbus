@@ -86,6 +86,7 @@ void nimbus_poll();
 bool nimbus_new_keypair(uint8_t id[ID_LEN]);
 bool nimbus_add_keypair(const uint8_t privkey[PRIVKEY_LEN], uint8_t id[ID_LEN]);
 bool nimbus_delete_keypair(const uint8_t id[ID_LEN]);
+bool nimbus_delete_keypairs();
 bool nimbus_get_private_key(const uint8_t id[ID_LEN],
   uint8_t privkey[PRIVKEY_LEN]);
 
