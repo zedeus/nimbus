@@ -73,6 +73,16 @@ type
   CTopic* = object
     topic*: Topic
 
+  CAccount* = object
+    account*: ptr byte
+    url: cstring
+
+  CKey* = object
+    id: cstring
+    address*: ptr byte
+    privateKeyID*: ptr byte
+    extKey*: ptr byte
+
 # Don't do this at home, you'll never get rid of ugly globals like this!
 var
   node: EthereumNode
@@ -490,3 +500,38 @@ proc nimbus_post_public(channel: cstring, payload: cstring)
                            topic = topic,
                            payload = npayload,
                            powTarget = 0.002)
+
+# TODO: Implement method
+proc nimbus_keystore_import_ecdsa(privateKey: ptr byte, passphrase: cstring, account: ptr CAccount):
+    bool {.exportc, dynlib, raises: [ValueError].} =
+  doAssert(not privateKey.isNil, "Private key cannot be nil.")
+
+  var keypair: KeyPair
+  try:
+    keypair.seckey = initPrivateKey(makeOpenArray(privateKey, 32))
+    keypair.pubkey = keypair.seckey.getPublicKey()
+  except EthKeysException, Secp256k1Exception:
+    error "Passed an invalid private key."
+    return false
+
+  return false
+
+# TODO: Implement method
+proc nimbus_keystore_import_single_extendedkey(extKeyJSON: cstring, passphrase: cstring, account: ptr CAccount):
+    bool {.exportc, dynlib, raises: [ValueError].} =
+  return false
+
+# TODO: Implement method
+proc nimbus_keystore_import_extendedkeyforpurpose(purpose: int, extKeyJSON: cstring, passphrase: cstring):
+    bool {.exportc, dynlib, raises: [ValueError].} =
+  return false
+
+# TODO: Implement method
+proc nimbus_keystore_account_decrypted_key(auth: cstring, account: ptr CAccount, key: ptr CKey):
+    bool {.exportc, dynlib, raises: [ValueError].} =
+  return false
+
+# TODO: Implement method
+proc nimbus_keystore_delete(account: ptr CKey, auth: cstring):
+    bool {.exportc, dynlib, raises: [ValueError].} =
+  return false

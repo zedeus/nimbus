@@ -9,6 +9,20 @@
 extern "C" {
 #endif
 
+/** Buffer lengths, can be used in go for convenience */
+#define TOPIC_LEN 4
+#define ID_LEN 32
+#define SYMKEY_LEN 32
+#define PRIVKEY_LEN 32
+#define BLOOM_LEN 64
+#define ADDRESS_LEN 20
+#define URL_LEN 256
+// EXTKEY_LEN is the length of a serialized public or private
+// extended key.  It consists of 4 bytes version, 1 byte depth, 4 bytes
+// fingerprint, 4 bytes child number, 32 bytes chain code, and 33 bytes
+// public/private key data.
+#define EXTKEY_LEN (4 + 1 + 4 + 4 + 32 + 33) // 78 bytes
+
 typedef struct {
   const uint8_t* decoded; /* Decoded payload */
   size_t decodedLen;  /* Decoded payload length */
@@ -16,9 +30,9 @@ typedef struct {
   const uint8_t* recipientPublicKey; /* 64 bytes public key, can be nil */
   uint32_t timestamp; /* Timestamp of creation message, expiry - ttl  */
   uint32_t ttl; /* TTL of message */
-  uint8_t topic[4]; /* Topic of message */
+  uint8_t topic[TOPIC_LEN]; /* Topic of message */
   double pow; /* PoW value of received message */
-  uint8_t hash[32]; /* Hash of message */
+  uint8_t hash[ID_LEN]; /* Hash of message */
 } received_message;
 
 typedef struct {
@@ -26,7 +40,7 @@ typedef struct {
   const uint8_t* privateKeyID; /* 32 bytes identifier for asymmetric key, set to nil if none */
   const uint8_t* source; /* 64 bytes public key, set to nil if none */
   double minPow; /* Minimum PoW that message must have */
-  uint8_t topic[4]; /* Will default to 0x00000000 if not provided */
+  uint8_t topic[TOPIC_LEN]; /* Will default to 0x00000000 if not provided */
   int allowP2P;
 } filter_options;
 
@@ -35,7 +49,7 @@ typedef struct {
   const uint8_t* pubKey; /* 64 bytes public key, set to nil if none */
   const uint8_t* sourceID; /* 32 bytes identifier for asymmetric key, set to nil if none */
   uint32_t ttl; /* TTL of message */
-  uint8_t topic[4]; /* Will default to 0x00000000 if not provided */
+  uint8_t topic[TOPIC_LEN]; /* Will default to 0x00000000 if not provided */
   uint8_t* payload; /* Payload to be send, can be len=0 but can not be nil */
   size_t payloadLen; /* Payload length */
   uint8_t* padding; /* Custom padding, can be set to nil */
@@ -45,16 +59,22 @@ typedef struct {
 } post_message;
 
 typedef struct {
-  uint8_t topic[4];
+  uint8_t topic[TOPIC_LEN];
 } topic;
 
-typedef void (*received_msg_handler)(received_message* msg, void* udata);
+typedef struct {
+  uint8_t address[ADDRESS_LEN];
+  char url[URL_LEN];
+} account;
 
-/** Buffer lengths, can be used in go for convenience */
-#define ID_LEN 32
-#define SYMKEY_LEN 32
-#define PRIVKEY_LEN 32
-#define BLOOM_LEN 64
+typedef struct {
+  char id[ID_LEN];
+  uint8_t address[ADDRESS_LEN];
+  uint8_t privateKeyID[PRIVKEY_LEN]; /* 32 bytes identifier for asymmetric key, set to nil if none */
+  uint8_t extKey[EXTKEY_LEN];
+} key;
+
+typedef void (*received_msg_handler)(received_message* msg, void* udata);
 
 /** Initialize Nim and the Status library. Must be called before anything else
  * of the API. Also, all following calls must come from the same thread as from
@@ -125,6 +145,13 @@ topic nimbus_channel_to_topic(const char* channel);
 
 void nimbus_post_public(const char* channel, const char* payload);
 void nimbus_join_public_chat(const char* channel, received_msg_handler msg);
+
+/** Key store API */
+bool nimbus_keystore_import_ecdsa(const uint8_t privkey[PRIVKEY_LEN], const char* passphrase, account* acc);
+bool nimbus_keystore_import_single_extendedkey(const char* extKeyJSON, const char* passphrase, account* acc);
+bool nimbus_keystore_import_extendedkeyforpurpose(int purpose, const char* extKeyJSON, const char* passphrase, account* acc);
+bool nimbus_keystore_account_decrypted_key(const char* auth, account* acc, key* k);
+bool nimbus_keystore_delete(const account* acc, const char* auth);
 
 #ifdef __cplusplus
 }
