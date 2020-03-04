@@ -25,7 +25,8 @@ const
     FkTangerine: "EIP150",
     FkSpurious: "EIP158",
     FkByzantium: "Byzantium",
-    FkConstantinople: "ConstantinopleFix",
+    FkConstantinople: "Constantinople",
+    FkPetersburg: "ConstantinopleFix",
     FkIstanbul: "Istanbul"
   }.toTable
 
@@ -36,6 +37,7 @@ const
     FkSpurious,
     FkByzantium,
     FkConstantinople,
+    FkPetersburg,
     FkIstanbul}
 
   nameToFork* = revmap(forkNames)
